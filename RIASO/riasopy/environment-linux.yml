@@ -1,0 +1,29 @@
+# riasopy build environment (Linux) - generates the conda environment `riasopy-build`
+# Reproduce: conda env create -f environment-linux.yml
+# Without conda (install it yourself): Rust toolchain (rustup, rust-version >= 1.93, gnu target).
+# Build: bash scripts/build_wheel.sh   (the script activates riasopy-build,
+#        provides HDF5_DIR, keeps RUSTFLAGS unset and assembles the font assets)
+# Runtime/acceptance: create another environment with python+numpy only (`riasopy`),
+#        pip install the produced wheel (it is self-contained; the build environment
+#        takes no part in running).
+#
+# Key constraints (same as the reference raiso; do not change):
+#   - hdf5 must be pinned to 1.14.x (not 2.x): hdf5-metno-sys 0.12 cannot parse HDF5 2.x version strings.
+#   - arpack is linked by the Rust `arpack-sys` crate via pkg-config; used by the ARPACK path of PCA.
+name: riasopy-build
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=2.4.6
+  - maturin=1.14.1
+  - pkg-config
+  - gcc
+  - arpack
+  - hdf5=1.14.6
+  - fontconfig
+  - freetype
+  - expat
+  - font-ttf-dejavu
+  - patchelf
+  - sysroot_linux-64=2.17
