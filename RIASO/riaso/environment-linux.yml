@@ -1,0 +1,17 @@
+name: riaso
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=2.4.6
+  - maturin=1.14.1
+  - pkg-config
+  - gcc
+  - arpack
+  - hdf5=1.14.6
+  - fontconfig
+  - freetype
+  - expat
+  - font-ttf-dejavu
+  - patchelf
+
