@@ -129,7 +129,7 @@ declare -A real_of_name   # referenced name -> real path
 while IFS='|' read -r nm real; do
   [ -z "${nm:-}" ] && continue
   real_of_name["$nm"]="$real"
-done < <("$(dirname "$0")/collect_libs.sh" dist/bin/riaso "$CONDA_PREFIX")
+done < <(bash "$(dirname "$0")/collect_libs.sh" dist/bin/riaso "$CONDA_PREFIX")
 
 declare -A name_of_real   # real path -> first name copied (one copy per file, the rest are symlinks)
 for nm in "${!real_of_name[@]}"; do
