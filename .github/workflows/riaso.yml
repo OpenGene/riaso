@@ -78,6 +78,7 @@ jobs:
             echo "HDF5_DIR=$prefix"
             echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig"
           } >> "$GITHUB_ENV"
+          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
           pkg-config --exists hdf5 && pkg-config --modversion hdf5
 
       - name: cargo clippy
