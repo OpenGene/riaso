@@ -1,5 +1,6 @@
 # riasopy build environment (Linux) - generates the conda environment `riasopy-build`
 # Reproduce: conda env create -f environment-linux.yml
+# Build inside quay.io/pypa/manylinux_2_28_x86_64, using its native compiler.
 # Without conda (install it yourself): Rust toolchain (rustup, rust-version >= 1.93, gnu target).
 # Build: bash scripts/build_wheel.sh   (the script activates riasopy-build,
 #        provides HDF5_DIR, keeps RUSTFLAGS unset and assembles the font assets)
@@ -18,7 +19,6 @@ dependencies:
   - numpy=2.4.6
   - maturin=1.14.1
   - pkg-config
-  - gcc
   - arpack
   - hdf5=1.14.6
   - fontconfig
@@ -26,8 +26,3 @@ dependencies:
   - expat
   - font-ttf-dejavu
   - patchelf
-  # Zig is used by `maturin build --zig --compatibility manylinux2014` to link the
-  # extension against glibc 2.17 instead of the runner's host glibc, so the wheel
-  # is tagged manylinux_2_17 (broadest installable baseline).
-  - zig
-  - sysroot_linux-64=2.17
