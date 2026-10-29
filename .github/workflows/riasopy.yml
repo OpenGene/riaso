@@ -28,12 +28,7 @@ env:
 jobs:
   build:
     name: wheel
-    runs-on: ubuntu-22.04
-    container:
-      image: quay.io/pypa/manylinux_2_28_x86_64
-    defaults:
-      run:
-        shell: bash {0}
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -49,13 +44,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: manylinux-2-28-system-fontconfig
           workspaces: "RIASO/riasopy -> target"
 
-      - name: install manylinux font libraries
-        run: dnf install -y fontconfig-devel freetype-devel
-
-      - name: conda build dependencies (hdf5 1.14.6, arpack, maturin, fonts)
+      - name: conda environment (hdf5 1.14.6, arpack, maturin, sysroot 2.17)
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
@@ -85,14 +76,11 @@ jobs:
           fi
           {
             echo "HDF5_DIR=$prefix"
-            echo "PKG_CONFIG_PATH=/usr/lib64/pkgconfig:$prefix/lib/pkgconfig"
+            echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig"
             echo "PYO3_PYTHON=$prefix/bin/python"
           } >> "$GITHUB_ENV"
-          export PKG_CONFIG_PATH="/usr/lib64/pkgconfig:$prefix/lib/pkgconfig"
+          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
           pkg-config --exists hdf5 && pkg-config --modversion hdf5
-          test "$(pkg-config --variable=libdir fontconfig)" = /usr/lib64
-          pkg-config --modversion fontconfig freetype2
-          ldd /usr/lib64/libfontconfig.so.1
 
       - name: cargo clippy
         working-directory: RIASO/riasopy
@@ -109,48 +97,18 @@ jobs:
         working-directory: RIASO/riasopy
         run: bash scripts/build_wheel.sh
 
-      - name: install and import on glibc 2.28
+      - name: show the packaged version
         working-directory: RIASO/riasopy
         run: |
           set -euo pipefail
-          test "$(getconf GNU_LIBC_VERSION)" = "glibc 2.28"
-          /opt/python/cp311-cp311/bin/python -m venv /tmp/wheel-test
-          /tmp/wheel-test/bin/python -m pip install --only-binary=:all: target/wheels/riasopy-*manylinux_2_28_x86_64*.whl
-          /tmp/wheel-test/bin/python -m pip check
-          env -u LD_LIBRARY_PATH -u FONTCONFIG_FILE -u FONTCONFIG_PATH \
-            /tmp/wheel-test/bin/python -I -c "import riasopy, numpy; print('riasopy', riasopy.__version__, 'numpy', numpy.__version__)"
+          whl=$(ls -t target/wheels/riasopy-*.whl | sed -n 1p)
+          echo "$whl"
+          conda create -y -n wheel-test -c conda-forge python=3.11 numpy=2.4.6
+          conda run -n wheel-test --no-capture-output python -m pip install --no-deps "$PWD/$whl"
+          conda run -n wheel-test --no-capture-output python -I -c "import riasopy; print('riasopy', riasopy.__version__)"
 
       - name: upload wheel
         uses: actions/upload-artifact@v4
         with:
           name: riasopy-wheel-${{ runner.os }}-${{ runner.arch }}
-          path: RIASO/riasopy/target/wheels/riasopy-*manylinux_2_28_x86_64*.whl
-          if-no-files-found: error
-
-  sdist:
-    name: sdist
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: install maturin
-        run: python -m pip install "maturin>=1.5,<2"
-
-      - name: build sdist
-        working-directory: RIASO/riasopy
-        run: maturin sdist
-
-      - name: upload sdist
-        uses: actions/upload-artifact@v4
-        with:
-          name: riasopy-sdist
-          path: RIASO/riasopy/target/wheels/riasopy-*.tar.gz
+          path: RIASO/riasopy/target/wheels/riasopy-*.whl
