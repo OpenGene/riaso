@@ -4,7 +4,8 @@
 For the wheel to run without the build machine, it must ship:
 
 * ``$CONDA_PREFIX/fonts/*.ttf`` -- from the conda package ``font-ttf-dejavu``;
-* ``$CONDA_PREFIX/etc/fonts``  -- from the conda package ``fontconfig``.
+* fontconfig configuration from ``$RIASOPY_FONTCONFIG_PREFIX/etc/fonts``
+  (defaults to ``$CONDA_PREFIX/etc/fonts``; CI uses ``/etc/fonts``).
 
 The source tree does **not** store this share (it used to be a copy of the binary
 dist and could drift from the build environment). ``build_wheel.sh`` calls this
@@ -15,7 +16,9 @@ rewritten here:
 
 1. ``<dir>`` entries hard-code build-machine absolute paths => only
    ``<dir prefix="relative">../../fonts</dir>`` is kept (resolved relative to the
-   config file itself, landing on ``share/fonts``);
+   config file itself, landing on ``share/fonts``). This is a relocatable
+   template: package import resolves it to an absolute path in a private
+   temporary config because fontconfig 2.13.1 does not support this prefix;
 2. the ``prefix`` attribute of ``<cachedir>`` has no effect => those lines are
    dropped, otherwise every run prints ``No writable cache directories`` twice;
 3. ``<include ...>conf.d</include>`` resolves against the libfontconfig
@@ -46,9 +49,11 @@ fail. Everything here therefore renames the directory into ``target/`` first
 import argparse
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REL_DIR = '<dir prefix="relative">../../fonts</dir>'
@@ -133,6 +138,19 @@ def _self_check(prefix: Path, conf: Path, fonts_dir: Path) -> None:
     fc_match = prefix / "bin" / "fc-match"
     if not fc_match.is_file():
         return
+    helper = Path(__file__).resolve().parent.parent / "python" / "riasopy" / "_fontconfig.py"
+    render_config = runpy.run_path(str(helper))["render_config"]
+    # Use the same resolution as package import. Older fontconfig ignores the
+    # relative prefix, so testing the relocatable template directly finds no fonts.
+    with tempfile.TemporaryDirectory(prefix="riasopy-font-check-") as td:
+        resolved_conf = Path(td) / "fonts.conf"
+        resolved_conf.write_text(
+            render_config(conf.read_text(encoding="utf-8"), fonts_dir), encoding="utf-8"
+        )
+        _check_resolved_config(fc_match, resolved_conf, fonts_dir)
+
+
+def _check_resolved_config(fc_match: Path, conf: Path, fonts_dir: Path) -> None:
     env = dict(os.environ, FONTCONFIG_FILE=str(conf))
     env.pop("FONTCONFIG_PATH", None)
     r = subprocess.run(
@@ -142,7 +160,7 @@ def _self_check(prefix: Path, conf: Path, fonts_dir: Path) -> None:
         env=env,
     )
     resolved = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
-    inside = bool(resolved) and Path(resolved).is_relative_to(fonts_dir.resolve())
+    inside = bool(resolved) and Path(resolved).resolve().is_relative_to(fonts_dir.resolve())
     if r.returncode != 0 or not inside or "error" in r.stderr.lower():
         raise SystemExit(
             f"fc-match self-check failed: rc={r.returncode} resolved={resolved!r} "

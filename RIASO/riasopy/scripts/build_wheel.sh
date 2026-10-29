@@ -89,10 +89,10 @@ echo "RUSTFLAGS unset (baseline x86-64, no AVX-512/AVX2 leakage)"
 # The source tree does not store share/ (that used to be a copy of the binary
 # dist and could drift from the build environment): generate it from the build
 # environment's fontconfig + font-ttf-dejavu, and delete it right after maturin.
-RIASOPY_FONTCONFIG_PREFIX=/ python scripts/prepare_share.py
 # Let the script clean up: on this network FS rm -rf hits ENOTEMPTY, so it
 # renames the directory into target/ first and deletes it there.
 trap 'python scripts/prepare_share.py --clean; echo "  removed python/riasopy/share (source tree stays clean)"' EXIT
+RIASOPY_FONTCONFIG_PREFIX=/ python scripts/prepare_share.py
 
 # --- 4. Build ---
 # maturin hard-links the cargo artifact and auditwheel repair rewrites it in
