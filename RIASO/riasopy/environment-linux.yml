@@ -21,8 +21,6 @@ dependencies:
   - pkg-config
   - arpack
   - hdf5=1.14.6
-  - fontconfig
-  - freetype
-  - expat
+  # fontconfig/freetype come from the manylinux container's RPM packages.
   - font-ttf-dejavu
   - patchelf
