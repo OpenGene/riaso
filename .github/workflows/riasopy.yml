@@ -49,8 +49,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: manylinux-2-28-native
+          key: manylinux-2-28-system-fontconfig
           workspaces: "RIASO/riasopy -> target"
+
+      - name: install manylinux font libraries
+        run: dnf install -y fontconfig-devel freetype-devel
 
       - name: conda build dependencies (hdf5 1.14.6, arpack, maturin, fonts)
         uses: conda-incubator/setup-miniconda@v3
@@ -82,11 +85,14 @@ jobs:
           fi
           {
             echo "HDF5_DIR=$prefix"
-            echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig"
+            echo "PKG_CONFIG_PATH=/usr/lib64/pkgconfig:$prefix/lib/pkgconfig"
             echo "PYO3_PYTHON=$prefix/bin/python"
           } >> "$GITHUB_ENV"
-          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+          export PKG_CONFIG_PATH="/usr/lib64/pkgconfig:$prefix/lib/pkgconfig"
           pkg-config --exists hdf5 && pkg-config --modversion hdf5
+          test "$(pkg-config --variable=libdir fontconfig)" = /usr/lib64
+          pkg-config --modversion fontconfig freetype2
+          ldd /usr/lib64/libfontconfig.so.1
 
       - name: cargo clippy
         working-directory: RIASO/riasopy
