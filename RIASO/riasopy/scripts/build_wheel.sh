@@ -1,7 +1,13 @@
 #!/bin/bash
-# One-shot build of a distributable wheel (installable on any x86_64 Linux).
+# Build an x86_64 Linux wheel requiring glibc 2.28 or newer.
 
 set -euo pipefail
+
+# Build natively on the supported baseline; a newer host would raise the ABI.
+if [ "$(getconf GNU_LIBC_VERSION)" != "glibc 2.28" ]; then
+  echo "Build inside quay.io/pypa/manylinux_2_28_x86_64 (glibc 2.28 required)." >&2
+  exit 1
+fi
 
 # --- Locate and initialise conda (no hard-coded install prefix) ---
 # Order: $CONDA_EXE -> conda on PATH -> common per-user install locations (all relative to $HOME).
@@ -83,12 +89,12 @@ trap 'python scripts/prepare_share.py --clean; echo "  removed python/riasopy/sh
 # maturin hard-links the cargo artifact and auditwheel repair rewrites it in
 # place; restore the sonames before a second build in the same target directory.
 python scripts/heal_artifact.py
-maturin build --release
+maturin build --release --locked --compatibility manylinux_2_28
 
 # --- 5. Collapse the extension module's RPATH to $ORIGIN/../riasopy.libs ---
 # maturin writes the build environment's $CONDA_PREFIX/lib into the RPATH;
 # dropping it is what makes the wheel truly self-contained.
-WHEEL=$(ls -t target/wheels/riasopy-*.whl | head -1)
+WHEEL=$(ls -t target/wheels/riasopy-*manylinux_2_28_x86_64*.whl | sed -n '1p')
 python scripts/fix_wheel_rpath.py "$WHEEL"
 
 echo ""
