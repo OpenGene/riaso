@@ -26,4 +26,8 @@ dependencies:
   - expat
   - font-ttf-dejavu
   - patchelf
+  # Zig is used by `maturin build --zig --compatibility manylinux2014` to link the
+  # extension against glibc 2.17 instead of the runner's host glibc, so the wheel
+  # is tagged manylinux_2_17 (broadest installable baseline).
+  - zig
   - sysroot_linux-64=2.17
