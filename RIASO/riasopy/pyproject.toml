@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "riasopy"
+version = "0.1.0"
+description = "Spatial omics data analysis framework (Rust core, Python bindings)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+# wheel runtime dependency: rust-numpy 0.27 <-> numpy ABI, pinned to 2.4.6 to match the build/run environment
+dependencies = ["numpy==2.4.6"]
+
+[tool.maturin]
+features = ["python"]
+python-source = "python"
