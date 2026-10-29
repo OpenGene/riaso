@@ -170,7 +170,8 @@ def _vacate(dest: Path) -> None:
 
 def prepare(prefix: Path, dest: Path) -> None:
     fonts = _find_fonts(prefix)
-    src_conf = prefix / "etc" / "fonts" / "fonts.conf"
+    config_prefix = Path(os.environ.get("RIASOPY_FONTCONFIG_PREFIX", str(prefix)))
+    src_conf = config_prefix / "etc" / "fonts" / "fonts.conf"
     if not src_conf.is_file():
         raise SystemExit(
             f"cannot find {src_conf} (the build environment needs the conda package fontconfig)"
@@ -183,15 +184,15 @@ def prepare(prefix: Path, dest: Path) -> None:
         shutil.copy2(f, dest / "fonts" / f.name)
 
     # symlinks=False (default) dereferences the conf.d symlinks into real files
-    shutil.copytree(prefix / "etc" / "fonts", dest / "etc" / "fonts")
+    shutil.copytree(config_prefix / "etc" / "fonts", dest / "etc" / "fonts")
     _rewrite_conf(dest / "etc" / "fonts" / "fonts.conf")
     # Everything is inlined now: drop conf.d entirely so nobody assumes it is read
     # (this also removes the README's build-machine path).
     conf_d = dest / "etc" / "fonts" / "conf.d"
     if conf_d.exists():
         shutil.rmtree(conf_d, ignore_errors=True)
-    _self_check(prefix, dest / "etc" / "fonts" / "fonts.conf", dest / "fonts")
-    print(f"  share generated: {len(ttf)} ttf from {fonts}, config from {prefix / 'etc/fonts'}")
+    _self_check(config_prefix, dest / "etc" / "fonts" / "fonts.conf", dest / "fonts")
+    print(f"  share generated: {len(ttf)} ttf from {fonts}, config from {config_prefix / 'etc/fonts'}")
 
 
 def main() -> None:

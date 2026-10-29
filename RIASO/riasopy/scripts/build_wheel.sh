@@ -41,6 +41,15 @@ unset CONDA_BIN _hook _conda_sh
 # Override with RIASOPY_ENV if needed.
 ENV_NAME="${RIASOPY_ENV:-riasopy-build}"
 conda activate "$ENV_NAME"
+
+# Use the container's font libraries. Conda's fontconfig can pull libxml2/ICU
+# built against a newer libstdc++, even when the host glibc is 2.28.
+# Keep conda as a fallback for HDF5 and ARPACK, which are not provided here.
+export PKG_CONFIG_PATH="/usr/lib64/pkgconfig:$CONDA_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+if [ "$(pkg-config --variable=libdir fontconfig)" != /usr/lib64 ]; then
+  echo "Install fontconfig-devel and freetype-devel in the manylinux container." >&2
+  exit 1
+fi
 echo "  build environment: $ENV_NAME ($(command -v python))"
 cd "$(dirname "$0")/.."
 
@@ -80,7 +89,7 @@ echo "RUSTFLAGS unset (baseline x86-64, no AVX-512/AVX2 leakage)"
 # The source tree does not store share/ (that used to be a copy of the binary
 # dist and could drift from the build environment): generate it from the build
 # environment's fontconfig + font-ttf-dejavu, and delete it right after maturin.
-python scripts/prepare_share.py
+RIASOPY_FONTCONFIG_PREFIX=/ python scripts/prepare_share.py
 # Let the script clean up: on this network FS rm -rf hits ENOTEMPTY, so it
 # renames the directory into target/ first and deletes it there.
 trap 'python scripts/prepare_share.py --clean; echo "  removed python/riasopy/share (source tree stays clean)"' EXIT
