@@ -12,13 +12,15 @@ on:
       - "RIASO/riasopy/**"
       - ".github/workflows/riasopy.yml"
   workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'release' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -113,6 +115,7 @@ jobs:
         with:
           name: riasopy-wheel-${{ runner.os }}-${{ runner.arch }}
           path: RIASO/riasopy/target/wheels/riasopy-*.whl
+          if-no-files-found: error
 
   sdist:
     name: sdist
@@ -142,3 +145,64 @@ jobs:
           name: riasopy-sdist
           path: RIASO/riasopy/dist/riasopy-*.tar.gz
           if-no-files-found: error
+
+  publish:
+    name: publish to PyPI
+    if: github.event_name == 'release'
+    needs: [build, sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/riasopy/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: riasopy-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: verify release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import email
+          import os
+          from pathlib import Path
+          import tarfile
+          import zipfile
+
+          tag = os.environ["RELEASE_TAG"]
+          expected = tag.removeprefix("v")
+          wheels = list(Path("dist").glob("riasopy-*.whl"))
+          sources = list(Path("dist").glob("riasopy-*.tar.gz"))
+          if not wheels or len(sources) != 1:
+              raise SystemExit("Expected built wheels and exactly one source distribution")
+          for artifact in wheels + sources:
+              if artifact.suffix == ".whl":
+                  with zipfile.ZipFile(artifact) as archive:
+                      entries = [n for n in archive.namelist() if n.endswith(".dist-info/METADATA")]
+                      if len(entries) != 1:
+                          raise SystemExit(f"Invalid wheel metadata: {artifact}")
+                      raw = archive.read(entries[0])
+              else:
+                  with tarfile.open(artifact) as archive:
+                      entries = [m for m in archive.getmembers()
+                                 if m.name.count("/") == 1 and m.name.endswith("/PKG-INFO")]
+                      if len(entries) != 1:
+                          raise SystemExit(f"Invalid source metadata: {artifact}")
+                      raw = archive.extractfile(entries[0]).read()
+              metadata = email.message_from_bytes(raw)
+              if metadata["Name"] != "riasopy" or metadata["Version"] != expected:
+                  raise SystemExit(f"{artifact}: package name/version does not match release {tag}")
+              print(f"Verified {artifact.name}: {metadata['Version']}")
+          PY
+
+      - name: publish distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
